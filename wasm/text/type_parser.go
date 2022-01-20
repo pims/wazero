@@ -45,6 +45,9 @@ type typeParser struct {
 	// that is not a "result".
 	onTypeEnd tokenParser
 
+	// onUnknownField is invoked when the grammar "(param)* (result)?" completes with a field name (tokenID)
+	onUnknownField tokenParser
+
 	// state is initially parsingParamOrResult and updated alongside tokenParser
 	state typeParsingState
 
@@ -102,11 +105,17 @@ type typeParser struct {
 //              beginTypeParamOrResult starts here --^          ^
 //                                     onTypeEnd resumes here --+
 //
-// The onTypeEnd parameter is invoked once any "param" and "result" fields have been consumed.
+// Ex. Given the source `(module (func $main (result i32) (i32.const 1))`
+//      beginTypeParamOrResult starts here --^             ^
+//                           onUnknownField resumes here --+
+//
+// The onTypeEnd parameter is invoked once all fields have been consumed.
+// The onUnknownField parameter is invoked on tokenKeyword after any "type" "param" or "result" fields.
 //
 // NOTE: An empty function is valid and will not reach a tokenLParen! Ex. `(module (import (func)))`
-func (p *typeParser) beginTypeUse(onTypeEnd tokenParser) {
+func (p *typeParser) beginTypeUse(onTypeEnd, onUnknownField tokenParser) {
 	p.onTypeEnd = onTypeEnd
+	p.onUnknownField = onUnknownField
 	p.state = parsingTypeUse
 	p.m.tokenParser = p.beginTypeParamOrResult
 }
@@ -139,6 +148,7 @@ func (p *typeParser) beginTypeParamOrResult(tok tokenType, tokenBytes []byte, li
 // NOTE: An empty function is valid and will not reach a tokenLParen! Ex. `(module (type (func)))`
 func (p *typeParser) beginType(onTypeEnd tokenParser) {
 	p.onTypeEnd = onTypeEnd
+	p.onUnknownField = onTypeEnd
 	p.state = parsingParamOrResult
 	p.m.tokenParser = p.beginParamOrResult
 }
@@ -167,13 +177,16 @@ func (p *typeParser) beginParamOrResult(tok tokenType, tokenBytes []byte, line, 
 			p.foundParam = false
 			p.currentLocalName = nil
 			p.m.tokenParser = p.parseParamName
+			return nil
 		case "result":
 			p.state = parsingResult
 			p.m.tokenParser = p.parseResult
+			return nil
 		case "type": // cannot repeat
 			return errors.New("redundant type")
+		default:
+			return p.onUnknownField(tok, tokenBytes, line, col)
 		}
-		return nil
 	}
 	// If we reach here, it is a syntax error, so punt it to onTypeEnd. Ex. (func ($param i32))
 	return p.onTypeEnd(tok, tokenBytes, line, col)
@@ -299,9 +312,9 @@ var typeFuncEmpty = &typeFunc{}
 
 // getTypeUse finalizes any current params or result and returns the current typeIndex and/or type. localNames are only
 // returned if defined inline.
-func (p *typeParser) getTypeUse() (typeIndex *index, inlined *inlinedTypeFunc, localNames wasm.NameMap) {
+func (p *typeParser) getTypeUse() (typeIndex *index, inlined *inlinedTypeFunc, paramNames wasm.NameMap) {
 	typeIndex = p.currentTypeIndex
-	localNames = p.currentParamNames
+	paramNames = p.currentParamNames
 
 	// Don't conflate lack of verification type with nullary
 	if typeIndex != nil && funcTypeEquals(typeFuncEmpty, p.currentParams, p.currentResult) {

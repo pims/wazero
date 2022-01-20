@@ -64,10 +64,10 @@ func DecodeModule(source []byte) (result *wasm.Module, err error) {
 	}
 
 	// Don't set the name section unless we found a name!
-	if localNames := mergeLocalNames(m); localNames != nil || m.name != "" || m.importFuncNames != nil {
+	if localNames := mergeLocalNames(m); localNames != nil || m.name != "" || m.funcNames != nil {
 		result.NameSection = &wasm.NameSection{
 			ModuleName:    m.name,
-			FunctionNames: m.importFuncNames,
+			FunctionNames: m.funcNames,
 			LocalNames:    localNames,
 		}
 	}
@@ -77,7 +77,7 @@ func DecodeModule(source []byte) (result *wasm.Module, err error) {
 // mergeLocalNames produces wasm.NameSection LocalNames. This has to be done post-parse as types can be defined after
 // functions that use them.
 func mergeLocalNames(m *module) wasm.IndirectNameMap {
-	j, jLen := 0, len(m.importFuncParamNames)
+	j, jLen := 0, len(m.paramNames)
 	if m.typeParamNames == nil && jLen == 0 {
 		return nil
 	}
@@ -89,7 +89,7 @@ func mergeLocalNames(m *module) wasm.IndirectNameMap {
 		// seek to see if we have any function-defined parameter names
 		var inlinedNames wasm.NameMap
 		for ; j < jLen; j++ {
-			next := m.importFuncParamNames[j]
+			next := m.paramNames[j]
 			if next.Index > funcIdx {
 				break // we have parameter names, but starting at a later index
 			} else if next.Index == funcIdx {

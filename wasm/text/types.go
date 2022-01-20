@@ -33,20 +33,23 @@ type module struct {
 	// Note: This is a map not a wasm.IndirectNameMap as late lookup is needed for after parsing
 	typeParamNames map[wasm.Index]wasm.NameMap
 
+	// funcNames are nil when no importFunc or function had a name
+	//
+	// See wasm.NameSection FunctionNames
+	funcNames wasm.NameMap
+
+	// paramNames are nil when no importFuncs or function had named (param) fields.
+	//
+	// Note: When set, this combines with any typeParamNames to produce wasm.NameSection LocalNames.
+	// This can't be done when parsing a function because types can be declared after the function that uses them.
+	// See https://www.w3.org/TR/wasm-core-1/#modules%E2%91%A0%E2%91%A2
+	paramNames wasm.IndirectNameMap
+
 	// importFuncs are imports describing functions added in insertion order. Ex (import... (func...))
 	importFuncs []*importFunc
 
-	// importFuncNames are nil when no importFunc had a name
-	//
-	// See wasm.NameSection FunctionNames
-	importFuncNames wasm.NameMap
-
-	// importFuncParamNames are nil when no importFuncs had named (param) fields.
-	//
-	// Note: When set, this combines with any typeParamNames to produce wasm.NameSection LocalNames.
-	// This can't be done when parsing an import because types can be declared after the import that uses them.
-	// See https://www.w3.org/TR/wasm-core-1/#modules%E2%91%A0%E2%91%A2
-	importFuncParamNames wasm.IndirectNameMap
+	// funcs are functions added in insertion order. Ex (module (func...))
+	funcs []*function
 
 	// exportFuncs are exports describing functions added in insertion order. Ex (export... (func...))
 	exportFuncs []*exportFunc
@@ -75,7 +78,7 @@ type inlinedTypeFunc struct {
 //
 // https://www.w3.org/TR/wasm-core-1/#indices%E2%91%A4
 type index struct {
-	// ID is set when its corresponding token is tokenID to a symbolic identifier index. Ex. $main
+	// ID is set when its corresponding token is tokenID to a symbolic identifier index. Ex. main
 	//
 	// Note: This must be checked for a corresponding index element name, as it is possible it doesn't exist.
 	// Ex. This is $t0 from (import "Math" "PI" (func (type $t0))), but (type $t0 (func ...)) does not exist.
@@ -155,6 +158,28 @@ type importFunc struct {
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#abbreviations%E2%91%A6
 	typeInlined *inlinedTypeFunc
+}
+
+// function corresponds to the text format of a WebAssembly function.
+//
+// Note: nothing is required per specification. Ex `(func)` is valid!
+//
+// See https://www.w3.org/TR/wasm-core-1/#functions%E2%91%A7
+type function struct {
+	// typeIndex is the optional index in module.types for the function signature. If index.ID is set, it must match
+	// typeFunc.name.
+	//
+	// See https://www.w3.org/TR/wasm-core-1/#text-typeuse
+	typeIndex *index
+
+	// typeInlined is set if there are any "param" or "result" fields. When set and typeIndex is also set, the signature
+	// in module.types must exist and match this.
+	//
+	// See https://www.w3.org/TR/wasm-core-1/#abbreviations%E2%91%A6
+	typeInlined *inlinedTypeFunc
+
+	// code are the instructions of this function encoded WebAssembly 1.0 (MVP) binary format
+	code []byte
 }
 
 // exportFunc corresponds to the text format of a WebAssembly function export.

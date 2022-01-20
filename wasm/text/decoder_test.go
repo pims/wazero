@@ -9,6 +9,7 @@ import (
 	"github.com/tetratelabs/wazero/wasm"
 )
 
+// TODO: backfill tests for functions just like imports
 func TestDecodeModule(t *testing.T) {
 	zero := uint32(0)
 	i32, i64 := wasm.ValueTypeI32, wasm.ValueTypeI64
@@ -250,7 +251,7 @@ func TestMergeLocalNames(t *testing.T) {
 				importFuncs: []*importFunc{
 					{importIndex: wasm.Index(0), module: "wasi_snapshot_preview1", name: "args_get", typeIndex: indexOne},
 				},
-				importFuncParamNames: wasm.IndirectNameMap{
+				paramNames: wasm.IndirectNameMap{
 					{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
 				},
 			},
@@ -282,7 +283,7 @@ func TestMergeLocalNames(t *testing.T) {
 					{importIndex: wasm.Index(0), module: "", name: "", typeIndex: indexZero},
 					{importIndex: wasm.Index(1), module: "wasi_snapshot_preview1", name: "args_get", typeIndex: indexOne},
 				},
-				importFuncParamNames: wasm.IndirectNameMap{
+				paramNames: wasm.IndirectNameMap{
 					{Index: wasm.Index(1), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
 				},
 			},
@@ -300,7 +301,7 @@ func TestMergeLocalNames(t *testing.T) {
 				typeParamNames: map[wasm.Index]wasm.NameMap{
 					wasm.Index(1): {{Index: wasm.Index(0), Name: "x"}, {Index: wasm.Index(0), Name: "y"}},
 				},
-				importFuncParamNames: wasm.IndirectNameMap{
+				paramNames: wasm.IndirectNameMap{
 					{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
 				},
 			},
